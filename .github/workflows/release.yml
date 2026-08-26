@@ -1,0 +1,217 @@
+name: Release installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (leave empty for next patch, e.g. 1.0.2)"
+        required: false
+        type: string
+  push:
+    branches: [main, master]
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick next version (keep all previous GitHub releases)
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags origin || true
+          BASE="$(node -p "require('./package.json').version")"
+          bump() {
+            node -e "const p=process.argv[1].split('.').map(Number); p[2]+=1; console.log(p.join('.'))" "$1"
+          }
+          exists() {
+            git rev-parse "refs/tags/v$1" >/dev/null 2>&1 \
+              || git ls-remote --tags origin "refs/tags/v$1" | grep -q . \
+              || gh release view "v$1" >/dev/null 2>&1
+          }
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="$BASE"
+            while exists "$VERSION"; do
+              VERSION="$(bump "$VERSION")"
+            done
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing as v$VERSION (older GitHub releases are kept)"
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin --bundles dmg,app --config signing.macos.json
+          - platform: ubuntu-22.04
+            args: --bundles deb,appimage
+          - platform: windows-latest
+            args: --bundles nsis,msi --config signing.windows.json
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set this release version
+        run: node scripts/set-app-version.js "${{ needs.version.outputs.version }}"
+
+      - name: Install Linux WebKitGTK
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf gnupg
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Intel + Apple Silicon targets
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Import Windows self-signed certificate
+        if: matrix.platform == 'windows-latest'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE)) {
+            '{}' | Set-Content signing.windows.json
+            Write-Host "No WINDOWS_CERTIFICATE secret — Windows build will be unsigned"
+            exit 0
+          }
+          New-Item -ItemType Directory -Force -Path certificate | Out-Null
+          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes("$pwd/certificate/certificate.pfx", $bytes)
+          $secure = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath certificate/certificate.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $secure
+          $thumb = $cert.Thumbprint
+          Write-Host "Imported cert thumbprint $thumb"
+          $extra = @{ bundle = @{ windows = @{ certificateThumbprint = $thumb; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } } | ConvertTo-Json -Depth 6
+          Set-Content -Path signing.windows.json -Value $extra
+
+      - name: macOS self-signed identity config
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          IDENT: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            printf '%s\n' '{"bundle":{"macOS":{"signingIdentity":"-"}}}' > signing.macos.json
+            echo "No APPLE_CERTIFICATE secret — Mac build will be ad-hoc signed"
+          else
+            python3 -c "import json,os; json.dump({'bundle':{'macOS':{'signingIdentity':os.environ['IDENT']}}}, open('signing.macos.json','w'))"
+            echo "Mac signing identity: $IDENT"
+          fi
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+          tauriScript: npm run tauri --
+          includeRelease: false
+          includeDebug: false
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: lgd-ftp-data-sync-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
+            signing/Install-this-CA-on-PCs.crt
+          if-no-files-found: warn
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create versioned GitHub Release (keep older versions)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          mkdir -p "out/${TAG}"
+          find artifacts -type f \( \
+            -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
+            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.crt' \
+          \) -exec cp -f {} "out/${TAG}/" \;
+          ls -lh "out/${TAG}"
+          NOTES="$(cat <<EOF
+          ## LGD FTP DATA SYNC ${VERSION}
+
+          Versioned installers. Previous GitHub releases are kept.
+
+          | OS | File |
+          |----|------|
+          | Windows | \`LGD FTP DATA SYNC_${VERSION}_x64-setup.exe\` |
+          | macOS | \`LGD FTP DATA SYNC_${VERSION}_*.dmg\` |
+          | Ubuntu | \`LGD FTP DATA SYNC_${VERSION}_*.deb\` / AppImage |
+
+          Self-signed Augmont build. Install \`Install-this-CA-on-PCs.crt\` on company PCs.
+          macOS Gatekeeper may still warn until Apple notarization (Open Anyway).
+          EOF
+          )"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "out/${TAG}"/* --clobber
+            gh release edit "$TAG" --latest --title "LGD FTP DATA SYNC ${VERSION}" --notes "$NOTES"
+          else
+            gh release create "$TAG" "out/${TAG}"/* --latest --title "LGD FTP DATA SYNC ${VERSION}" --notes "$NOTES"
+          fi
+          echo "Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          echo "All versions: https://github.com/${GITHUB_REPOSITORY}/releases"

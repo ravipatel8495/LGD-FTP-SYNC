@@ -1,0 +1,15 @@
+node_modules/
+src-tauri/target/
+dist/
+.DS_Store
+*.log
+certs/
+signing.windows.json
+signing.macos.json
+*.p12
+*.pfx
+*.key
+*.p8
+
+1/
+SYNC/

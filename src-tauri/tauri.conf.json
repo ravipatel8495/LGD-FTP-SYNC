@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LGD FTP DATA SYNC",
+  "version": "1.0.1",
+  "identifier": "com.diamonds.ftpuploader",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "LGD FTP DATA SYNC",
+        "width": 820,
+        "height": 620,
+        "minWidth": 700,
+        "minHeight": 520,
+        "visible": true,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Augmont",
+    "category": "Utility",
+    "copyright": "© Augmont",
+    "shortDescription": "Watch a folder and auto-upload CSV/Excel over FTP",
+    "longDescription": "Watches LGD and NATURAL listing files and uploads them over FTP, FTPS, or SFTP.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "windows/open-with-log.bat"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "dmg": {
+        "background": "../build/dmg-background.png",
+        "windowSize": { "width": 660, "height": 428 },
+        "appPosition": { "x": 180, "y": 250 },
+        "applicationFolderPosition": { "x": 480, "y": 250 }
+      }
+    },
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": false
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "windows/nsis-header.bmp",
+        "sidebarImage": "windows/nsis-sidebar.bmp"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  }
+}

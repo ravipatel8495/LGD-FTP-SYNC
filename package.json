@@ -1,0 +1,27 @@
+{
+  "name": "lgd-ftp-data-sync",
+  "productName": "LGD FTP DATA SYNC",
+  "version": "1.0.1",
+  "description": "Watch a file or folder and auto-upload changes over FTP / FTPS / SFTP",
+  "author": "LGD <lgd@augmont.com>",
+  "homepage": "https://diamonds.augmont.com",
+  "license": "MIT",
+  "scripts": {
+    "start": "tauri dev",
+    "tauri": "tauri",
+    "dist:win": "tauri build --bundles nsis,msi",
+    "dist:mac": "tauri build --target universal-apple-darwin --bundles dmg,app",
+    "dist:mac:arm": "tauri build --target aarch64-apple-darwin --bundles dmg,app",
+    "dist:linux": "tauri build --bundles deb,appimage",
+    "dist:all": "tauri build",
+    "certs": "bash scripts/create-self-signed-certs.sh",
+    "sign:mac": "bash scripts/create-self-signed-certs.sh && bash scripts/sign-macos.sh",
+    "dmg": "bash scripts/make-macos-dmg.sh"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

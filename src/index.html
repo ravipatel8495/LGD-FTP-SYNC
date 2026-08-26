@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>LGD FTP DATA SYNC</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      padding: 12px 14px;
+      background: #f4f5f7; color: #1c1c1e;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 100%;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1e1e20; color: #eee; }
+      .card { background: #2a2a2d !important; }
+      #log { background: #111 !important; }
+    }
+    h1 { font-size: 16px; margin: 0; font-weight: 700; }
+    .appHeader { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+    .headerBtns { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+    .headerBtns button { height: 28px; font-size: 11px; padding: 0 10px; }
+    .appHeader .logoChip {
+      background: #fff; border-radius: 6px; padding: 4px 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.12);
+    }
+    .appHeader img { height: 28px; display: block; }
+    .card {
+      background: #fff; border-radius: 8px; padding: 10px 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      flex: 0 0 auto;
+    }
+    .card.logCard {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .bottomRow {
+      display: flex;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-height: 150px;
+      align-items: stretch;
+    }
+    label { display: block; font-size: 10px; font-weight: 600; margin: 4px 0 2px; opacity: .8; }
+    input, select {
+      display: block;
+      width: 100%;
+      height: 28px;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0 8px;
+      font-family: inherit;
+      font-size: 12px;
+      line-height: normal;
+      color: #1c1c1e;
+      -webkit-text-fill-color: #1c1c1e;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      outline: none;
+      color-scheme: light;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    select option {
+      color: #1c1c1e;
+      background-color: #fff;
+    }
+    input::placeholder {
+      color: #8e8e93;
+      -webkit-text-fill-color: #8e8e93;
+      opacity: 1;
+    }
+    select {
+      padding-right: 32px;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23555' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5 L6 8 L9.5 4.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 12px;
+    }
+    input:focus, select:focus {
+      border-color: #2f6fed;
+      box-shadow: 0 0 0 3px rgba(47, 111, 237, .22);
+    }
+    @media (prefers-color-scheme: dark) {
+      input, select {
+        color-scheme: dark;
+        background-color: #1e1e20;
+        color: #eee;
+        -webkit-text-fill-color: #eee;
+        border-color: #444;
+      }
+      select option {
+        color: #eee;
+        background-color: #1e1e20;
+      }
+      input::placeholder {
+        color: #8e8e93;
+        -webkit-text-fill-color: #8e8e93;
+      }
+      select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23c8c8cc' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M2.5 4.5 L6 8 L9.5 4.5'/%3E%3C/svg%3E");
+      }
+      input:focus, select:focus { border-color: #5b9aff; }
+      .btn-add { color: #7eb0ff; border-color: #7eb0ff; }
+      .btn-add:hover { background: rgba(126, 176, 255, .12); }
+    }
+    .row { display: flex; gap: 8px; align-items: flex-end; }
+    .row > div { flex: 1; min-width: 0; }
+    .row > div.protocol { flex: 0 0 168px; }
+    .row > div.small { flex: 0 0 88px; }
+    .pathRow { display: flex; gap: 6px; align-items: center; }
+    .pathRow input { flex: 1; }
+    .pathRow button { height: 28px; flex-shrink: 0; padding: 0 8px; font-size: 11px; }
+    .watchHint { font-size: 11px; opacity: .75; margin: 2px 0 6px; line-height: 1.3; }
+    .watchHead {
+      display: flex; gap: 8px; margin-bottom: 2px;
+      font-size: 11px; font-weight: 600; opacity: .8;
+    }
+    .watchHeadType { flex: 0 0 120px; }
+    .watchHeadPath { flex: 1; }
+    .watchRow {
+      display: flex; gap: 8px; align-items: center;
+      margin-top: 6px;
+    }
+    .watchRowType { flex: 0 0 120px; }
+    .watchRowPath { flex: 1; min-width: 0; }
+    .watchRow .removeRow {
+      width: 28px; padding: 0; flex-shrink: 0; height: 28px;
+    }
+    .addTypeRow { margin-top: 4px; }
+    .btn-add {
+      background: transparent;
+      color: #2f6fed;
+      border: 1px dashed #2f6fed;
+      height: 26px;
+      padding: 0 8px;
+      font-size: 11px;
+    }
+    .btn-add:hover { background: rgba(47, 111, 237, .08); }
+    button {
+      padding: 0 10px; height: 28px; font-size: 12px; font-weight: 600;
+      border: none; border-radius: 5px; cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    .btn-grey { background: #e2e2e6; color: #222; }
+    .btn-blue { background: #2f6fed; color: #fff; }
+    .btn-green { background: #1fa15a; color: #fff; }
+    .btn-red { background: #d64545; color: #fff; }
+    .actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+    #status { margin-top: 2px; font-size: 11px; min-height: 14px; }
+    #status.ok { color: #1fa15a; } #status.error { color: #d64545; }
+    .watch-state { font-size: 11px; font-weight: 600; margin-left: auto; }
+    #log {
+      background: #16181c; color: #d7dae0; font-family: Menlo, Consolas, monospace;
+      font-size: 11px; border-radius: 6px; padding: 8px;
+      flex: 1 1 auto; min-height: 0; overflow-y: auto; white-space: pre-wrap;
+    }
+    #log .ok { color: #52d68a; } #log .error { color: #ff7b7b; }
+    #log .info { color: #8ab8ff; } #log .progress { color: #ffd36a; }
+    #log .logLine { margin: 0 0 4px; }
+    #log .pctBar {
+      display: block;
+      height: 3px;
+      margin-top: 4px;
+      background: #3a3f48;
+      border-radius: 2px;
+      overflow: hidden;
+      white-space: normal;
+    }
+    #log .pctBar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: #d9a02b;
+      border-radius: 2px;
+    }
+    #log .pctBar.done { display: none !important; }
+    details { margin: 0 0 2px; }
+    summary { cursor: pointer; font-weight: 600; font-size: 11px; }
+    details p { font-size: 11px; opacity: .85; margin: 3px 0 4px 12px; line-height: 1.3; }
+
+    /* ---- splash overlay: fills the whole window, fades into the app ---- */
+    #splash {
+      position: fixed; inset: 0; z-index: 999;
+      background: linear-gradient(160deg, #14454b 0%, #0d3136 55%, #0a272b 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: #fff; user-select: none; cursor: default;
+      transition: opacity .7s ease;
+    }
+    #splash.fadeOut { opacity: 0; pointer-events: none; }
+    #splash .scene { perspective: 900px; width: 160px; height: 160px; position: relative; margin-bottom: 16px; }
+    #splash .mark { width: 84px; height: 84px; animation: sFloat 3s ease-in-out infinite; }
+    #splash .orbit1 { width: 128px; height: 128px; }
+    #splash .orbit2 { width: 128px; height: 128px; }
+    #splash .orbit3 { width: 156px; height: 156px; }
+    #splash .logoChip2 { padding: 8px 16px; margin-bottom: 12px; }
+    #splash .logoChip2 img { width: 170px; display: block; }
+    #splash h2 { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+    #splash p { font-size: 12px; opacity: .75; margin-top: 6px; }
+    #splash .dots { margin-top: 12px; }
+    #splash .scene > div {
+      position: absolute; inset: 0; margin: auto;
+      border-radius: 50%; transform-style: preserve-3d;
+    }
+    #splash .mark img { width: 100%; height: 100%; display: block; }
+    #splash .orbit1 {
+      border: 3px solid rgba(217,160,43,.9);
+      border-left-color: transparent; border-right-color: transparent;
+      animation: sSpinY 2.6s linear infinite;
+    }
+    #splash .orbit2 {
+      border: 3px solid rgba(185,188,194,.75);
+      border-top-color: transparent; border-bottom-color: transparent;
+      animation: sSpinX 3.4s linear infinite;
+    }
+    #splash .orbit3 {
+      border: 2px dashed rgba(217,160,43,.35);
+      animation: sSpinZ 14s linear infinite;
+    }
+    @keyframes sSpinY { from { transform: rotateY(0deg) rotateX(18deg); } to { transform: rotateY(360deg) rotateX(18deg); } }
+    @keyframes sSpinX { from { transform: rotateX(0deg) rotateY(-24deg); } to { transform: rotateX(360deg) rotateY(-24deg); } }
+    @keyframes sSpinZ { from { transform: rotateZ(0deg); } to { transform: rotateZ(360deg); } }
+    @keyframes sFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    #splash .logoChip2 {
+      background: #fff; border-radius: 12px;
+      padding: 14px 26px; margin-bottom: 22px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+      animation: sRise .8s ease-out;
+    }
+    #splash .logoChip2 img { width: 250px; display: block; }
+    @keyframes sRise { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+    #splash h2 { font-size: 20px; font-weight: 700; letter-spacing: 1.5px; }
+    #splash p { font-size: 13px; opacity: .75; margin-top: 8px; }
+    #splash .dots { margin-top: 22px; display: flex; gap: 8px; }
+    #splash .dots span {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #d9a02b; opacity: .25;
+      animation: sPulse 1.2s infinite;
+    }
+    #splash .dots span:nth-child(2) { animation-delay: .2s; }
+    #splash .dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes sPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+    .sidebarScrim {
+      position: fixed; inset: 0; z-index: 40;
+      background: rgba(0,0,0,.35);
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    body.sidebar-open .sidebarScrim { opacity: 1; pointer-events: auto; }
+    .sidebar {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 41;
+      width: min(360px, 92vw);
+      background: #fff;
+      box-shadow: -8px 0 24px rgba(0,0,0,.18);
+      transform: translateX(100%);
+      transition: transform .22s ease;
+      display: flex; flex-direction: column;
+    }
+    body.sidebar-open .sidebar { transform: translateX(0); }
+    @media (prefers-color-scheme: dark) {
+      .sidebar { background: #2a2a2d; color: #eee; }
+    }
+    .sidebarHead {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px 8px; border-bottom: 1px solid rgba(0,0,0,.08);
+      flex: 0 0 auto;
+    }
+    .sidebarHead h2 { font-size: 14px; margin: 0; flex: 1; }
+    .sidebarBody { flex: 1; overflow-y: auto; padding: 10px 12px 16px; }
+    .faqPane details { margin: 0 0 6px; }
+    .faqPane summary { font-size: 12px; }
+    .faqPane details p { font-size: 12px; margin: 4px 0 6px 12px; line-height: 1.4; }
+    .guideScrim {
+      position: fixed; inset: 0; z-index: 42;
+      background: transparent;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    body.guide-on .guideScrim { opacity: 1; pointer-events: auto; }
+    .guide-spot {
+      outline: 2px solid #2f6fed !important;
+      border-radius: 6px;
+      position: relative;
+      z-index: 46;
+      background-color: #fff;
+      box-shadow: 0 0 0 4px rgba(47,111,237,.28), 0 0 0 9999px rgba(0,0,0,.45) !important;
+    }
+    @media (prefers-color-scheme: dark) {
+      .guide-spot { background-color: #2a2a2d; }
+    }
+    .guideTip {
+      display: none;
+      position: fixed;
+      z-index: 50;
+      width: 340px;
+      max-width: calc(100vw - 24px);
+      background: #fff;
+      color: #1c1c1e;
+      border-radius: 10px;
+      box-shadow: 0 12px 36px rgba(0,0,0,.28);
+      padding: 12px 14px 12px;
+    }
+    body.guide-on .guideTip { display: block !important; }
+    .guideTip::before {
+      content: "";
+      position: absolute;
+      left: var(--arrow-x, 24px);
+      margin-left: -8px;
+      border: 8px solid transparent;
+    }
+    .guideTip[data-place="below"]::before {
+      top: -8px;
+      border-bottom-color: #fff;
+      border-top: none;
+    }
+    .guideTip[data-place="above"]::before {
+      bottom: -8px;
+      border-top-color: #fff;
+      border-bottom: none;
+    }
+    @media (prefers-color-scheme: dark) {
+      .guideTip { background: #2a2a2d; color: #eee; }
+      .guideTip[data-place="below"]::before { border-bottom-color: #2a2a2d; }
+      .guideTip[data-place="above"]::before { border-top-color: #2a2a2d; }
+    }
+    .guideTipHead {
+      display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;
+    }
+    .guideTipHead h3 { margin: 0; font-size: 13px; font-weight: 700; flex: 1; }
+    .guideLangs { display: flex; gap: 4px; margin: 0 0 8px; }
+    .guideLangs button {
+      height: 22px; padding: 0 8px; font-size: 11px; font-weight: 600;
+      background: #e8e8ec; color: #222;
+    }
+    .guideLangs button.on { background: #2f6fed; color: #fff; }
+    @media (prefers-color-scheme: dark) {
+      .guideLangs button { background: #3a3a3e; color: #eee; }
+      .guideLangs button.on { background: #2f6fed; color: #fff; }
+    }
+    .guideTipClose {
+      width: 22px; height: 22px; padding: 0; flex-shrink: 0;
+      font-size: 14px; line-height: 1; background: transparent; color: inherit;
+      opacity: .55;
+    }
+    .guideTipClose:hover { opacity: 1; }
+    .guideTip .clickHint {
+      background: rgba(47,111,237,.1); border-left: 3px solid #2f6fed;
+      padding: 7px 9px; border-radius: 4px; font-size: 12px; margin-bottom: 8px;
+    }
+    .guideTip p { margin: 0 0 10px; font-size: 12px; line-height: 1.45; opacity: .9; }
+    .guideNav { display: flex; gap: 6px; align-items: center; }
+    .guideNav .spacer { flex: 1; }
+    .guideCount { font-size: 11px; opacity: .55; }
+  </style>
+</head>
+<body>
+  <div id="splash">
+    <div class="scene">
+      <div class="orbit3"></div>
+      <div class="orbit1"></div>
+      <div class="orbit2"></div>
+      <div class="mark"><img src="assets/mark.svg" alt="" /></div>
+    </div>
+    <div class="logoChip2"><img src="assets/wordmark.png" alt="Augmont" /></div>
+    <h2>LGD FTP DATA SYNC</h2>
+    <p>Starting up…</p>
+    <div class="dots"><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="appHeader">
+    <div class="logoChip"><img src="assets/wordmark.png" alt="Augmont" /></div>
+    <h1>LGD FTP DATA SYNC — auto upload on file change</h1>
+    <div class="headerBtns">
+      <button type="button" class="btn-grey" id="guideBtn">How to use</button>
+      <button type="button" class="btn-grey" id="faqBtn">FAQ</button>
+    </div>
+  </div>
+
+  <div class="card settings">
+    <div class="row">
+      <div class="protocol">
+        <label>Connection Type</label>
+        <select id="protocol">
+          <option value="ftp">FTP</option>
+          <option value="ftps">FTPS (explicit)</option>
+          <option value="ftps-implicit">FTPS (implicit)</option>
+          <option value="sftp">SFTP</option>
+        </select>
+      </div>
+      <div>
+        <label>Host Name</label>
+        <input id="host" placeholder="ftp.example.com" />
+      </div>
+      <div class="small">
+        <label>Port</label>
+        <input id="port" placeholder="21" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>User Name</label>
+        <input id="user" placeholder="username" />
+      </div>
+      <div>
+        <label>Password</label>
+        <input id="password" type="password" placeholder="password" />
+      </div>
+    </div>
+    <label style="margin-top:8px">Product type &amp; local path</label>
+    <p class="watchHint">Same FTP login. Add LGD and NATURAL rows — uploads go to <b>/LGD</b> or <b>/NATURAL</b>.</p>
+    <div class="watchHead">
+      <span class="watchHeadType">Product Type</span>
+      <span class="watchHeadPath">Local File or Folder to Watch</span>
+    </div>
+    <div id="watchRows"></div>
+    <div class="addTypeRow">
+      <button type="button" class="btn-add" id="addTypeBtn">+ Add another type</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-blue" id="testBtn">Test FTP</button>
+      <button class="btn-green" id="startBtn">Start Watching</button>
+      <button class="btn-red" id="stopBtn" disabled>Stop</button>
+      <span class="watch-state" id="watchState">⚪ Not watching</span>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="bottomRow">
+  <div class="card logCard">
+    <label style="margin-top:0">Activity Log</label>
+    <div id="log"></div>
+  </div>
+  </div>
+
+  <div class="guideScrim" id="guideScrim"></div>
+  <div class="guideTip" id="guideTip" role="dialog" aria-labelledby="guideTipTitle" hidden>
+    <div class="guideTipHead">
+      <h3 id="guideTipTitle"></h3>
+      <button type="button" class="guideTipClose" id="guideClose" aria-label="Close">×</button>
+    </div>
+    <div class="guideLangs" id="guideLangs">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="hi">हिं</button>
+      <button type="button" data-lang="gu">ગુ</button>
+    </div>
+    <div class="clickHint" id="guideHint"></div>
+    <p id="guideText"></p>
+    <div class="guideNav">
+      <button type="button" class="btn-grey" id="guideBack">Previous</button>
+      <span class="guideCount" id="guideCount"></span>
+      <span class="spacer"></span>
+      <button type="button" class="btn-blue" id="guideNext">Next</button>
+    </div>
+  </div>
+
+  <div class="sidebarScrim" id="sidebarScrim"></div>
+  <aside class="sidebar" id="sidebar" aria-hidden="true">
+    <div class="sidebarHead">
+      <h2 id="sidebarTitle">FAQ</h2>
+      <button type="button" class="btn-grey" id="sidebarClose">Close</button>
+    </div>
+    <div class="sidebarBody">
+      <div id="faqPane" class="faqPane">
+        <details open>
+          <summary>How does this app work?</summary>
+          <p>Each row is one product type plus a file or folder to watch. Existing files upload when watching starts. After that, a changed file waits <b>30 seconds</b>, then uploads. The Activity Log shows upload %. LGD files go to <b>/LGD</b> and NATURAL files to <b>/NATURAL</b>.</p>
+        </details>
+        <details>
+          <summary>Which connection type and port should I use?</summary>
+          <p><b>FTP</b> port 21 (plain), <b>FTPS explicit</b> port 21, <b>FTPS implicit</b> port 990, <b>SFTP</b> port 22. The port fills in when you pick a type.</p>
+        </details>
+        <details>
+          <summary>How do LGD and NATURAL share one FTP account?</summary>
+          <p>Same host, user, and password. Add a second row with <b>+ Add another type</b>. LGD uploads to <b>/LGD</b>, NATURAL to <b>/NATURAL</b>.</p>
+        </details>
+        <details>
+          <summary>Can I watch a single file instead of a folder?</summary>
+          <p>Yes. Click <b>File…</b> for a CSV/Excel file, or <b>Folder…</b> for a whole folder.</p>
+        </details>
+        <details>
+          <summary>Does it keep working if I close this window?</summary>
+          <p>Yes. Close hides to the tray (menu bar on Mac). Use tray <b>Quit</b> to exit fully.</p>
+        </details>
+        <details>
+          <summary>What happens after a shutdown or restart?</summary>
+          <p>After you click <b>Start Watching</b> once, the app starts at login and resumes watching by itself.</p>
+        </details>
+        <details>
+          <summary>Are deleted files also deleted on the server?</summary>
+          <p>No. Only new and changed files are uploaded. Hidden files (starting with a dot) are skipped.</p>
+        </details>
+        <details>
+          <summary>Where are my settings stored?</summary>
+          <p>In <b>config.json</b> on this computer. Host, user, and password reload after an update. Keep this PC trusted — the password is stored in plain text.</p>
+        </details>
+        <details>
+          <summary>Upload failed — what do I check?</summary>
+          <p>Click <b>Test FTP</b>. Check host, user, password, port, and firewall. Try another connection type. Failed uploads retry when the file changes again.</p>
+        </details>
+      </div>
+    </div>
+  </aside>
+
+  <script src="tauri-bridge.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
