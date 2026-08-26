@@ -122,18 +122,22 @@ jobs:
           $extra = @{ bundle = @{ windows = @{ certificateThumbprint = $thumb; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } } | ConvertTo-Json -Depth 6
           Set-Content -Path signing.windows.json -Value $extra
 
-      - name: macOS self-signed identity config
+      # Self-signed "Augmont Goldtech" is NOT a valid Apple codesign identity on
+      # GitHub's Mac runners (security find-identity will not resolve it).
+      # Use ad-hoc "-" unless a real Apple Developer ID is configured.
+      - name: macOS signing config
         if: matrix.platform == 'macos-latest'
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          IDENT: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IDENT: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            printf '%s\n' '{"bundle":{"macOS":{"signingIdentity":"-"}}}' > signing.macos.json
-            echo "No APPLE_CERTIFICATE secret — Mac build will be ad-hoc signed"
-          else
+          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ] && [ -n "${IDENT:-}" ]; then
             python3 -c "import json,os; json.dump({'bundle':{'macOS':{'signingIdentity':os.environ['IDENT']}}}, open('signing.macos.json','w'))"
-            echo "Mac signing identity: $IDENT"
+            echo "Apple Developer identity: $IDENT"
+          else
+            printf '%s\n' '{"bundle":{"macOS":{"signingIdentity":"-"}}}' > signing.macos.json
+            echo "Ad-hoc Mac signing (no Apple Developer ID). Gatekeeper still needs Open Anyway."
           fi
 
       - name: Install frontend deps
@@ -143,9 +147,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
+          # Only pass Apple certs when notarizing with a paid Developer ID.
+          # Passing a self-signed p12 makes Tauri look up "Augmont Goldtech" and fail:
+          # "failed to resolve signing identity".
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_ID && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_ID && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_ID && secrets.APPLE_SIGNING_IDENTITY || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -154,22 +161,16 @@ jobs:
           args: ${{ matrix.args }}
           tauriScript: npm run tauri
           # includeRelease = production tauri build (NOT "attach to GitHub Release").
-          # false + includeDebug false skipped the compile; only the .crt was uploaded.
           includeRelease: true
           includeDebug: false
           includeUpdaterJson: false
 
       - name: Pack CA into macOS DMG
         if: matrix.platform == 'macos-latest'
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
         run: |
           set -euo pipefail
           find src-tauri/target -path '*/bundle/*' -name '*.dmg' -type f | while IFS= read -r dmg; do
             bash scripts/embed-ca-in-dmg.sh "$dmg" signing/Install-this-CA-on-PCs.crt
-            if [ -n "${APPLE_SIGNING_IDENTITY:-}" ] && [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp=none "$dmg" || true
-            fi
           done
 
       - name: Collect installers

@@ -18,6 +18,11 @@ This repo uses every **free** signing option that actually exists:
 | Apple Developer ID + notarize | $99/year | Removes the Mac “could not verify” dialog |
 | Windows EV/OV code signing | Paid | Reduces/removes SmartScreen |
 
+GitHub Actions **macOS** builds are **ad-hoc signed** (`signingIdentity: "-"`).
+A self-signed “Augmont Goldtech” identity cannot be resolved on GitHub’s Mac
+runners (`failed to resolve signing identity`). That does not remove Gatekeeper.
+Paid Apple Developer ID + notarization is still required to skip Open Anyway.
+
 GitHub Releases pack the Augmont CA **inside** the Windows `.exe` (setup
 installs it for the current user) and the macOS `.dmg` (file is in the disk
 image and inside the `.app`). You do not need a separate `.crt` download.
