@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   version:
@@ -179,9 +181,8 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Create versioned GitHub Release (keep older versions)
+      - name: Gather installers and SHA-256 checksums
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
@@ -191,7 +192,23 @@ jobs:
             -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
             -o -name '*.deb' -o -name '*.AppImage' -o -name '*.crt' \
           \) -exec cp -f {} "out/${TAG}/" \;
-          ls -lh "out/${TAG}"
+          cd "out/${TAG}"
+          shasum -a 256 * > SHA256SUMS.txt
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - name: Attest installers (free GitHub provenance)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'out/v${{ needs.version.outputs.version }}/*'
+
+      - name: Create versioned GitHub Release (keep older versions)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
           NOTES="$(cat <<EOF
           ## LGD FTP DATA SYNC ${VERSION}
 
@@ -205,6 +222,10 @@ jobs:
 
           Self-signed Augmont build. Install \`Install-this-CA-on-PCs.crt\` on company PCs.
           macOS Gatekeeper may still warn until Apple notarization (Open Anyway).
+
+          **Free verification** (no paid Apple/Microsoft cert):
+          - \`SHA256SUMS.txt\` on this release
+          - GitHub provenance: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`
           EOF
           )"
           if gh release view "$TAG" >/dev/null 2>&1; then

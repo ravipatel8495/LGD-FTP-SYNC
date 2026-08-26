@@ -3,14 +3,34 @@
 Unsigned `.exe`, `.dmg`, and `.app` files are blocked by many company firewalls,
 Windows SmartScreen, and macOS Gatekeeper. This project signs installers.
 
-## What a self-signed certificate can and cannot do
+## What is free vs paid
 
-| Check | Self-signed (included) | Purchased certificate |
+There is **no free Apple or Microsoft certificate** that removes Gatekeeper or
+SmartScreen. Those require a paid Developer ID / EV-OV cert.
+
+This repo uses every **free** signing option that actually exists:
+
+| Method | Cost | What it does |
 |---|---|---|
-| File is marked **signed** (some firewalls only check this) | Yes | Yes |
-| Windows SmartScreen “Unknown publisher” | Still warns until you install the CA, or buy an **EV/OV code signing** cert | OV helps; **EV** usually avoids the warning |
-| macOS Gatekeeper “cannot be opened” | Still warns | **Apple Developer ID + notarize** ($99/year) |
-| Company firewall “unsigned executable” | Often allowed after IT installs `augmont-ca.crt` | Allowed |
+| Augmont self-signed `.p12` (already in GitHub secrets) | Free | File is marked signed; Windows/Mac OS still warn |
+| `SHA256SUMS.txt` on each GitHub Release | Free | Check the file was not corrupted |
+| [GitHub artifact attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations) (Sigstore) | Free | Proves the installer was built by this repo’s Actions |
+| Apple Developer ID + notarize | $99/year | Removes the Mac “could not verify” dialog |
+| Windows EV/OV code signing | Paid | Reduces/removes SmartScreen |
+
+Verify a download:
+
+```bash
+# checksums from the Release page
+shasum -a 256 -c SHA256SUMS.txt
+
+# free GitHub provenance
+gh attestation verify "LGD FTP DATA SYNC_1.0.1_x64-setup.exe" --repo ravipatel8495/LGD-FTP-SYNC
+
+# or
+bash scripts/verify-release.sh path/to/installer SHA256SUMS.txt
+```
+
 
 ## Files (created on this Mac, not committed)
 
