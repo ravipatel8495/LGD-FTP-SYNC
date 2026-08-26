@@ -7,10 +7,6 @@ on:
         description: "Version to publish (leave empty for next patch, e.g. 1.0.2)"
         required: false
         type: string
-  push:
-    branches: [main, master]
-    tags:
-      - "v*"
 
 permissions:
   contents: write

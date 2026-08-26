@@ -72,13 +72,13 @@ importing `augmont-codesign.pfx` into `Cert:\CurrentUser\My`, then set
 `bundle.windows.certificateThumbprint` in `tauri.conf.json` to the value in
 `certs/windows-thumbprint.txt`.
 
-## GitHub Actions (auto-release, self-signed)
+## GitHub Actions (manual release)
 
 Each successful GitHub build publishes a **new versioned Release**
 (`v1.0.1`, `v1.0.2`, …). Older versions stay on the Releases page.
 
 If `v1.0.1` already exists, the next build becomes `v1.0.2`. You can also
-type a version in **Run workflow**, or push a tag such as `v1.0.3`.
+type a version in **Run workflow**. Pushing to `main` does **not** start a release.
 
 **Repo → Settings → Secrets and variables → Actions** — add:
 
@@ -90,7 +90,7 @@ type a version in **Run workflow**, or push a tag such as `v1.0.3`.
 | `APPLE_CERTIFICATE_PASSWORD` | same as `WINDOWS_CERTIFICATE_PASSWORD` |
 | `APPLE_SIGNING_IDENTITY` | `Augmont Goldtech` |
 
-Then push to `main`, or **Actions → Release installers → Run workflow**.
+Then **Actions → Release installers → Run workflow**.
 Each run adds a new version page under **Releases**. Previous versions stay.
 
 `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` are only for **Apple notarization**

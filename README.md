@@ -166,13 +166,13 @@ npm run dist:win                    # run on Windows 10/11: NSIS .exe + MSI
 npm run dist:linux                  # run on Ubuntu 22.04+: .deb + AppImage
 ```
 
-To get **Windows + macOS + Ubuntu** in one go, push this project to GitHub.
-Every push to `main` (and **Actions → Release installers → Run workflow**)
-builds all three installers, self-signs them, and publishes a **new** GitHub
-Release (`v1.0.1`, then `v1.0.2`, …). Older version releases are **kept**.
+To get **Windows + macOS + Ubuntu** in one go, use GitHub Actions **manually**:
+**Actions → Release installers → Run workflow**. That builds all three
+installers and publishes a **new** GitHub Release (`v1.0.1`, then `v1.0.2`, …).
+Older version releases are **kept**. Pushing to `main` does **not** deploy.
 
 1. Repo → **Settings → Secrets and variables → Actions** — add secrets from [SIGNING.md](SIGNING.md).
-2. Push to `main` or run the workflow.
+2. **Actions → Release installers → Run workflow** (optional version, or leave empty for next patch).
 3. Open **Releases** — each version is a separate page with its Windows / Mac / Ubuntu files.
 
 Output from a local build is also under `src-tauri/target/*/release/bundle/`.
