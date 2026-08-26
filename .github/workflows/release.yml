@@ -153,22 +153,35 @@ jobs:
           projectPath: .
           args: ${{ matrix.args }}
           tauriScript: npm run tauri --
-          includeRelease: false
+          # includeRelease = production tauri build (NOT "attach to GitHub Release").
+          # false + includeDebug false skipped the compile; only the .crt was uploaded.
+          includeRelease: true
           includeDebug: false
+          includeUpdaterJson: false
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-out
+          find src-tauri/target -path '*/bundle/*' -type f \( \
+            -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
+            -o -name '*.deb' -o -name '*.AppImage' \
+          \) -exec cp -f {} dist-out/ \;
+          ls -lh dist-out || true
+          count="$(find dist-out -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) | wc -l | tr -d ' ')"
+          if [ "$count" -eq 0 ]; then
+            echo "No installers were produced. Dumping bundle dirs:"
+            find src-tauri/target -type d -name bundle -print -o -name '*.exe' -print -o -name '*.dmg' -print | head -80
+            exit 1
+          fi
 
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: lgd-ftp-data-sync-${{ matrix.platform }}
-          path: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/universal-apple-darwin/release/bundle/**/*.dmg
-            signing/Install-this-CA-on-PCs.crt
-          if-no-files-found: warn
+          path: dist-out/*
+          if-no-files-found: error
 
   publish:
     needs: [version, build]
@@ -190,9 +203,16 @@ jobs:
           mkdir -p "out/${TAG}"
           find artifacts -type f \( \
             -name '*.exe' -o -name '*.msi' -o -name '*.dmg' \
-            -o -name '*.deb' -o -name '*.AppImage' -o -name '*.crt' \
+            -o -name '*.deb' -o -name '*.AppImage' \
           \) -exec cp -f {} "out/${TAG}/" \;
+          cp -f signing/Install-this-CA-on-PCs.crt "out/${TAG}/"
           cd "out/${TAG}"
+          count="$(find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) | wc -l | tr -d ' ')"
+          if [ "$count" -eq 0 ]; then
+            echo "Publish aborted: no OS installers in artifacts (only extras like .crt)."
+            find ../../artifacts -type f | head -50
+            exit 1
+          fi
           shasum -a 256 * > SHA256SUMS.txt
           ls -lh
           cat SHA256SUMS.txt
