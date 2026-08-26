@@ -143,27 +143,31 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      - name: Build installers
+      - name: Build installers (Windows / Linux)
+        if: matrix.platform != 'macos-latest'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only pass Apple certs when notarizing with a paid Developer ID.
-          # Passing a self-signed p12 makes Tauri look up "Augmont Goldtech" and fail:
-          # "failed to resolve signing identity".
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_ID && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_ID && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_ID && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: .
           args: ${{ matrix.args }}
           tauriScript: npm run tauri
-          # includeRelease = production tauri build (NOT "attach to GitHub Release").
           includeRelease: true
           includeDebug: false
           includeUpdaterJson: false
+
+      # Do not pass APPLE_CERTIFICATE (even as empty). Tauri treats the env var as
+      # "import this p12" and `security import` fails with SecKeychainItemImport.
+      - name: Build installers (macOS, ad-hoc)
+        if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID || true
+          test -f signing.macos.json
+          npx tauri build ${{ matrix.args }}
 
       - name: Pack CA into macOS DMG
         if: matrix.platform == 'macos-latest'
