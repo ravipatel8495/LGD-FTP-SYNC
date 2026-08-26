@@ -86,27 +86,91 @@ type a version in **Run workflow**. Pushing to `main` does **not** start a relea
 |---|---|
 | `WINDOWS_CERTIFICATE` | contents of `certs/augmont-codesign.p12.base64.txt` |
 | `WINDOWS_CERTIFICATE_PASSWORD` | contents of `certs/PASSWORD.txt` |
-| `APPLE_CERTIFICATE` | same as `WINDOWS_CERTIFICATE` (self-signed `.p12` base64) |
-| `APPLE_CERTIFICATE_PASSWORD` | same as `WINDOWS_CERTIFICATE_PASSWORD` |
-| `APPLE_SIGNING_IDENTITY` | `Augmont Goldtech` |
+| `APPLE_*` | **Developer ID** values — see section below. Do not use the self-signed p12. |
 
 Then **Actions → Release installers → Run workflow**.
 Each run adds a new version page under **Releases**. Previous versions stay.
 
-`APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` are only for **Apple notarization**
-(paid Apple Developer). Self-sign still shows Gatekeeper “could not verify”
-until notarized.
+## Apple Developer ID + notarize (Mac: no Open Anyway)
 
-## GitHub Actions secrets (for signed Windows + Apple notarized Mac)
+This is the only way a GitHub-downloaded `.dmg` opens with no extra clicks.
+Cost: [Apple Developer Program](https://developer.apple.com/programs/) **$99/year**
+(use Augmont’s company account if it already exists).
+
+Do **not** reuse the self-signed `Augmont Goldtech` `.p12` for Mac. Replace
+`APPLE_CERTIFICATE` with a **Developer ID Application** certificate.
+
+### 1. Enroll
+
+1. Open https://developer.apple.com/programs/ and enroll (company account preferred).
+2. Wait until the membership is **Active**.
+3. Copy **Team ID** (10 characters) from https://developer.apple.com/account → **Membership details**.
+
+### 2. Create a CSR on a Mac
+
+1. Open **Keychain Access**.
+2. Menu: **Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority…**
+3. User Email: your Apple ID email. Common Name: `Augmont Goldtech` (or the legal company name).
+4. Select **Saved to disk**. Save `CertificateSigningRequest.certSigningRequest`.
+
+### 3. Create Developer ID Application cert
+
+1. https://developer.apple.com/account/resources/certificates/list → **+**
+2. Choose **Developer ID Application** (not Apple Development, not Mac App Store).
+3. Continue → upload the CSR → download `developerID_application.cer`.
+4. Double-click the `.cer` so it appears in Keychain Access (login keychain).
+
+### 4. Export `.p12`
+
+1. In Keychain Access, under **My Certificates**, find  
+   `Developer ID Application: Your Name (TEAMID)`.
+2. Expand it, select the cert **and** the private key, right-click → **Export**.
+3. Format: **Personal Information Exchange (.p12)**. Set a password. Save `developer-id.p12`.
+4. Confirm the identity string (Terminal):
+
+```bash
+security find-identity -v -p codesigning | grep "Developer ID Application"
+```
+
+Copy the full quoted name, for example:
+
+`Developer ID Application: Augmont Goldtech Private Limited (AB12CD34EF)`
+
+### 5. App-specific password (for notarization)
+
+1. https://appleid.apple.com → **Sign-In and Security → App-Specific Passwords**.
+2. Generate one named `github-notary`. Copy the `xxxx-xxxx-xxxx-xxxx` password.
+   This is **not** your Apple ID login password.
+
+### 6. GitHub secrets
+
+Repo → **Settings → Secrets and variables → Actions**. **Replace** any old
+self-signed Apple secrets:
 
 | Secret | Value |
 |---|---|
-| `WINDOWS_CERTIFICATE` | contents of `augmont-codesign.p12.base64.txt` |
-| `WINDOWS_CERTIFICATE_PASSWORD` | contents of `PASSWORD.txt` |
-| `APPLE_CERTIFICATE` | same p12 base64 (self-signed) **or** your Apple Developer ID `.p12` |
-| `APPLE_CERTIFICATE_PASSWORD` | p12 password |
-| `APPLE_SIGNING_IDENTITY` | `Augmont Goldtech` (self-signed) or `Developer ID Application: Your Name (TEAMID)` |
-| `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | only for **Apple notarization** (paid Apple Developer) |
+| `APPLE_CERTIFICATE` | `base64 -i developer-id.p12 \| tr -d '\n'` (one line) |
+| `APPLE_CERTIFICATE_PASSWORD` | password you set on the `.p12` |
+| `APPLE_SIGNING_IDENTITY` | exact `Developer ID Application: … (TEAMID)` string from step 4 |
+| `APPLE_ID` | Apple ID email |
+| `APPLE_PASSWORD` | app-specific password from step 5 |
+| `APPLE_TEAM_ID` | 10-character Team ID |
+
+Encode the p12:
+
+```bash
+base64 -i developer-id.p12 | tr -d '\n' | pbcopy
+```
+
+Paste into `APPLE_CERTIFICATE`. Keep `developer-id.p12` off git.
+
+### 7. Release
+
+**Actions → Release installers → Run workflow**. The Mac log must show
+`Apple Developer ID + notarize`. After it finishes, download the new `.dmg`
+from Releases — Gatekeeper should allow it with a normal double-click.
+
+If the log still says `Ad-hoc Mac signing`, one of the six secrets is empty.
 
 ## Recommended for production (no warnings)
 

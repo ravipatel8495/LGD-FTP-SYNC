@@ -118,22 +118,25 @@ jobs:
           $extra = @{ bundle = @{ windows = @{ certificateThumbprint = $thumb; digestAlgorithm = "sha256"; timestampUrl = "http://timestamp.digicert.com" } } } | ConvertTo-Json -Depth 6
           Set-Content -Path signing.windows.json -Value $extra
 
-      # Self-signed "Augmont Goldtech" is NOT a valid Apple codesign identity on
-      # GitHub's Mac runners (security find-identity will not resolve it).
-      # Use ad-hoc "-" unless a real Apple Developer ID is configured.
       - name: macOS signing config
+        id: macsign
         if: matrix.platform == 'macos-latest'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           IDENT: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
         run: |
-          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ] && [ -n "${IDENT:-}" ]; then
+          if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ] && [ -n "${IDENT:-}" ] \
+            && [ -n "${APPLE_CERTIFICATE:-}" ] && [ -n "${APPLE_PASSWORD:-}" ]; then
             python3 -c "import json,os; json.dump({'bundle':{'macOS':{'signingIdentity':os.environ['IDENT']}}}, open('signing.macos.json','w'))"
-            echo "Apple Developer identity: $IDENT"
+            echo "Apple Developer ID + notarize: $IDENT"
+            echo "notarize=true" >> "$GITHUB_OUTPUT"
           else
             printf '%s\n' '{"bundle":{"macOS":{"signingIdentity":"-"}}}' > signing.macos.json
-            echo "Ad-hoc Mac signing (no Apple Developer ID). Gatekeeper still needs Open Anyway."
+            echo "Ad-hoc Mac signing (Apple Developer secrets incomplete)."
+            echo "notarize=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install frontend deps
@@ -152,10 +155,23 @@ jobs:
           includeDebug: false
           includeUpdaterJson: false
 
-      # Do not pass APPLE_CERTIFICATE (even as empty). Tauri treats the env var as
-      # "import this p12" and `security import` fails with SecKeychainItemImport.
+      - name: Build installers (macOS, Apple notarized)
+        if: matrix.platform == 'macos-latest' && steps.macsign.outputs.notarize == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          test -f signing.macos.json
+          npx tauri build ${{ matrix.args }}
+
       - name: Build installers (macOS, ad-hoc)
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && steps.macsign.outputs.notarize != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -165,8 +181,9 @@ jobs:
           test -f signing.macos.json
           npx tauri build ${{ matrix.args }}
 
+      # Rewriting a notarized DMG invalidates the Apple ticket — only pack CA on ad-hoc builds.
       - name: Pack CA into macOS DMG
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && steps.macsign.outputs.notarize != 'true'
         run: |
           set -euo pipefail
           find src-tauri/target -path '*/bundle/*' -name '*.dmg' -type f | while IFS= read -r dmg; do
