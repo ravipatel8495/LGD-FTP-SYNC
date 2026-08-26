@@ -1,0 +1,14 @@
+LGD FTP DATA SYNC — official GitHub build
+
+Download only from:
+https://github.com/ravipatel8495/LGD-FTP-SYNC/releases
+
+This Windows setup (.exe) and the macOS disk image (.dmg) are built and
+published by GitHub Actions. The Augmont CA is packed inside this installer.
+
+Verify a downloaded installer:
+
+  gh attestation verify "LGD FTP DATA SYNC_*_x64-setup.exe" --repo ravipatel8495/LGD-FTP-SYNC
+  gh attestation verify "LGD FTP DATA SYNC_*.dmg" --repo ravipatel8495/LGD-FTP-SYNC
+
+Or check SHA256SUMS.txt on the same GitHub Release page.

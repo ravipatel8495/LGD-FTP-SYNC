@@ -13,9 +13,13 @@ new or changed file to your server over **FTP, FTPS (explicit), FTPS (implicit),
 
 ## Installation
 
-### Option A — Install from a built installer (for end users)
+### Option A — Install from GitHub Releases (for end users)
 
-Files are in the `dist/` folder after a release build.
+Download the Windows `.exe` or macOS `.dmg` from
+[Releases](https://github.com/ravipatel8495/LGD-FTP-SYNC/releases).
+The Augmont CA is packed inside those files (Windows setup installs it automatically).
+
+Local copies are also in the `dist/` folder after a release build.
 
 | OS | Minimum version | File | How to install |
 |----|-----------------|------|----------------|
@@ -25,15 +29,12 @@ Files are in the `dist/` folder after a release build.
 
 **Windows 7, 8, and 8.1 are not supported.** This app uses WebView2, which Microsoft only provides for Windows 10 and 11.
 
-> **Windows note:** the installer is code-signed with Augmont’s certificate.
-> First install `dist/signing/Install-this-CA-on-PCs.crt` (or run
-> `install-augmont-ca.ps1` as Administrator) so the company firewall accepts
-> the `.exe`. A purchased EV/OV code-signing cert is still required to silence
-> SmartScreen completely. See [SIGNING.md](SIGNING.md).
+> **Windows:** the `.exe` is signed and contains `Install-this-CA-on-PCs.crt`;
+> setup installs that CA for the current user. See [SIGNING.md](SIGNING.md).
 >
-> **macOS note:** the DMG is signed. If Gatekeeper still blocks it, right-click
-> the app → **Open** → **Open** (needed only the first time). Apple notarization
-> (paid Apple Developer) removes that prompt.
+> **macOS:** the `.dmg` contains the same CA inside the app. If macOS still
+> blocks the first open, right-click the app → **Open**. Apple notarization
+> (paid Developer ID) is the only way to skip that prompt.
 
 ### Option B — Run from source (for developers)
 

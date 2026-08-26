@@ -152,12 +152,25 @@ jobs:
         with:
           projectPath: .
           args: ${{ matrix.args }}
-          tauriScript: npm run tauri --
+          tauriScript: npm run tauri
           # includeRelease = production tauri build (NOT "attach to GitHub Release").
           # false + includeDebug false skipped the compile; only the .crt was uploaded.
           includeRelease: true
           includeDebug: false
           includeUpdaterJson: false
+
+      - name: Pack CA into macOS DMG
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || 'Augmont Goldtech' }}
+        run: |
+          set -euo pipefail
+          find src-tauri/target -path '*/bundle/*' -name '*.dmg' -type f | while IFS= read -r dmg; do
+            bash scripts/embed-ca-in-dmg.sh "$dmg" signing/Install-this-CA-on-PCs.crt
+            if [ -n "${APPLE_SIGNING_IDENTITY:-}" ] && [ "$APPLE_SIGNING_IDENTITY" != "-" ]; then
+              codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp=none "$dmg" || true
+            fi
+          done
 
       - name: Collect installers
         shell: bash
@@ -240,12 +253,13 @@ jobs:
           | macOS | \`LGD FTP DATA SYNC_${VERSION}_*.dmg\` |
           | Ubuntu | \`LGD FTP DATA SYNC_${VERSION}_*.deb\` / AppImage |
 
-          Self-signed Augmont build. Install \`Install-this-CA-on-PCs.crt\` on company PCs.
-          macOS Gatekeeper may still warn until Apple notarization (Open Anyway).
+          Windows \`.exe\` and macOS \`.dmg\` are GitHub Actions builds. The Augmont CA is packed inside both (the Windows setup installs it automatically).
 
-          **Free verification** (no paid Apple/Microsoft cert):
-          - \`SHA256SUMS.txt\` on this release
-          - GitHub provenance: \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`
+          Verify from GitHub:
+          \`\`\`
+          gh attestation verify <downloaded-file> --repo ${GITHUB_REPOSITORY}
+          \`\`\`
+          Checksums: \`SHA256SUMS.txt\` on this page.
           EOF
           )"
           if gh release view "$TAG" >/dev/null 2>&1; then

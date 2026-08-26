@@ -41,7 +41,9 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "windows/open-with-log.bat"
+      "windows/open-with-log.bat",
+      "windows/Install-this-CA-on-PCs.crt",
+      "windows/GITHUB-VERIFY.txt"
     ],
     "macOS": {
       "minimumSystemVersion": "10.15",
@@ -64,7 +66,8 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "headerImage": "windows/nsis-header.bmp",
-        "sidebarImage": "windows/nsis-sidebar.bmp"
+        "sidebarImage": "windows/nsis-sidebar.bmp",
+        "installerHooks": "windows/installer-hooks.nsh"
       }
     },
     "linux": {

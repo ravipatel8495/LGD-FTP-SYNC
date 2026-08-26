@@ -18,7 +18,12 @@ This repo uses every **free** signing option that actually exists:
 | Apple Developer ID + notarize | $99/year | Removes the Mac “could not verify” dialog |
 | Windows EV/OV code signing | Paid | Reduces/removes SmartScreen |
 
+GitHub Releases pack the Augmont CA **inside** the Windows `.exe` (setup
+installs it for the current user) and the macOS `.dmg` (file is in the disk
+image and inside the `.app`). You do not need a separate `.crt` download.
+
 Verify a download:
+
 
 ```bash
 # checksums from the Release page
