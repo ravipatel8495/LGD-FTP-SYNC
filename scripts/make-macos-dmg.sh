@@ -101,7 +101,9 @@ hdiutil detach "$MOUNT" >/dev/null
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
 hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -o "$OUT" >/dev/null
-codesign --force --sign "${CODESIGN_IDENTITY:-390D682CF7D3571E5ED89784FFEA6A8E94BF6BF7}" "$OUT" 2>/dev/null \
-  || codesign --force --sign - "$OUT" 2>/dev/null || true
+# Default to ad-hoc ("-"): a self-signed cert buys nothing on macOS Gatekeeper
+# (only Apple's own Developer ID chain is trusted), so don't sign with one by
+# default. Pass CODESIGN_IDENTITY to use a real Developer ID cert instead.
+codesign --force --sign "${CODESIGN_IDENTITY:--}" "$OUT" 2>/dev/null || true
 echo "DMG ready: $OUT"
 ls -lh "$OUT"

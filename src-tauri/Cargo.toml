@@ -24,3 +24,7 @@ chrono = { version = "0.4.45", features = ["clock"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"

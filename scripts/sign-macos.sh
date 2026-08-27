@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Signs the macOS .app + .dmg with the Augmont self-signed identity.
+# Legacy: signs with the local self-signed Augmont identity (not Apple Developer ID).
+# For internal distribution use: bash scripts/sign-macos-adhoc.sh
+# (ad-hoc, Hardened Runtime, no fake Apple cert).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

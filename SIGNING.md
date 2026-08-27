@@ -54,10 +54,22 @@ bash scripts/verify-release.sh path/to/installer SHA256SUMS.txt
 
 ## Sign the macOS build
 
+The self-signed `.p12` above is a **Windows-only** trick (installing a custom
+CA into Trusted Root actually works there). macOS Gatekeeper only trusts
+Apple's own Developer ID chain, so a self-signed cert buys nothing on a Mac —
+`scripts/sign-macos.sh` (the old self-signed path) is kept only for
+reference and is no longer wired into any `npm run` script.
+
+For internal/local Mac builds, ad-hoc sign with Hardened Runtime instead:
+
 ```bash
-bash scripts/create-self-signed-certs.sh
-bash scripts/sign-macos.sh
+npm run dist:mac:internal
 ```
+
+See [docs/macos-internal-distribution.md](docs/macos-internal-distribution.md)
+for the full flow and how to install on another Mac. `spctl` rejecting the
+app and "is damaged" on first open (after a browser/Slack download) are
+expected for ad-hoc — see the next section for the only real fix.
 
 ## Windows PC (so the firewall accepts the EXE)
 

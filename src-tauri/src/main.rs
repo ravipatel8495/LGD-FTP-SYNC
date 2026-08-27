@@ -75,7 +75,23 @@ fn win_error_box(msg: &str) {
     }
 }
 
+// macOS silently kills idle/backgrounded "foreground" apps via Automatic
+// Termination + Sudden Termination once their window is occluded/unfocused
+// for a while — no crash, no log, it just vanishes. A background tray app
+// like this one must opt out or it can be reaped mid-session with no user
+// interaction at all.
+#[cfg(target_os = "macos")]
+fn disable_macos_auto_termination() {
+    use objc2_foundation::{NSProcessInfo, NSString};
+    let info = NSProcessInfo::processInfo();
+    let reason = NSString::from_str("Watches folders and uploads in the background");
+    info.disableAutomaticTermination(&reason);
+    info.disableSuddenTermination();
+}
+
 fn main() {
+    #[cfg(target_os = "macos")]
+    disable_macos_auto_termination();
     log_startup("process start");
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("The app crashed:\n{info}");

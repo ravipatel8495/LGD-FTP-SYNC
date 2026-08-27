@@ -32,9 +32,12 @@ Local copies are also in the `dist/` folder after a release build.
 > **Windows:** the `.exe` is signed and contains `Install-this-CA-on-PCs.crt`;
 > setup installs that CA for the current user. See [SIGNING.md](SIGNING.md).
 >
-> **macOS:** the `.dmg` contains the same CA inside the app. If macOS still
-> blocks the first open, right-click the app → **Open**. Apple notarization
-> (paid Developer ID) is the only way to skip that prompt.
+> **macOS (internal / ad-hoc):** `npm run dist:mac:internal` then follow
+> [docs/macos-internal-distribution.md](docs/macos-internal-distribution.md).
+> Right-click → Open on first launch. Do not disable Gatekeeper globally.
+>
+> **macOS (public download):** Apple Developer ID + notarization is required
+> so Gatekeeper allows a normal double-click. See [SIGNING.md](SIGNING.md).
 
 ### Option B — Run from source (for developers)
 

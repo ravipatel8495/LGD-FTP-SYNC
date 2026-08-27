@@ -2633,6 +2633,8 @@ dependencies = [
  "chrono",
  "notify",
  "notify-debouncer-mini",
+ "objc2",
+ "objc2-foundation",
  "russh",
  "russh-sftp",
  "serde",
