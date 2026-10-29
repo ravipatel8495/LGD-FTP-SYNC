@@ -305,15 +305,28 @@ $("testBtn").addEventListener("click", async () => {
   const config = getConfig();
   if (!config.host || !config.user) return setStatus(false, "Please enter host and user name.");
   $("testBtn").disabled = true;
-  setStatus(true, `Testing ${config.productType} folder...`);
-  const result = await window.api.testFtp(config);
-  setStatus(result.ok, result.message);
-  addLog({
-    type: result.ok ? "ok" : "error",
-    message: result.ok ? `Test OK: ${result.message}` : `Test failed: ${result.message}`,
-    time: new Date().toLocaleTimeString()
-  });
-  $("testBtn").disabled = false;
+  setStatus(true, "Connecting… testing login, then /LGD and /NATURAL…");
+  try {
+    const result = await window.api.testFtp(config);
+    const ok = !!(result && result.ok);
+    const message = (result && result.message) || (ok ? "Connected." : "Test failed.");
+    setStatus(ok, message);
+    addLog({
+      type: ok ? "ok" : "error",
+      message: ok ? `Test OK: ${message}` : `Test failed: ${message}`,
+      time: new Date().toLocaleTimeString()
+    });
+  } catch (err) {
+    const message = (err && err.message) ? err.message : String(err);
+    setStatus(false, message);
+    addLog({
+      type: "error",
+      message: `Test failed: ${message}`,
+      time: new Date().toLocaleTimeString()
+    });
+  } finally {
+    $("testBtn").disabled = false;
+  }
 });
 
 $("startBtn").addEventListener("click", async () => {
@@ -321,8 +334,14 @@ $("startBtn").addEventListener("click", async () => {
   if (!config.localPaths.LGD && !config.localPaths.NATURAL) {
     return setStatus(false, "Please select a file or folder to watch.");
   }
-  const started = await window.api.startWatch(config);
-  if (started) setWatching(true);
+  const result = await window.api.startWatch(config);
+  const ok = result === true || (result && result.ok);
+  if (ok) {
+    setWatching(true);
+    if (result && result.message) setStatus(true, result.message);
+  } else {
+    setStatus(false, (result && result.message) || "Could not start watching.");
+  }
 });
 
 $("stopBtn").addEventListener("click", async () => {

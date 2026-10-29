@@ -213,7 +213,7 @@ fn enqueue_existing(
     target: &Path,
     product_type: &str,
     tx: &mpsc::UnboundedSender<QueueItem>,
-) {
+) -> usize {
     let is_dir = target.is_dir();
     let base_dir = if is_dir {
         target.to_path_buf()
@@ -226,6 +226,7 @@ fn enqueue_existing(
     } else if target.is_file() {
         existing.push(target.to_path_buf());
     }
+    let count = existing.len();
     for path in existing {
         let relative = path
             .strip_prefix(&base_dir)
@@ -234,6 +235,7 @@ fn enqueue_existing(
             .to_string();
         let _ = tx.send((path, relative, product_type.to_string()));
     }
+    count
 }
 
 fn schedule_upload(
@@ -372,11 +374,43 @@ pub fn start_watching(app: &AppHandle, config: &FtpConfig) -> Result<(), String>
     let (tx, rx) = mpsc::unbounded_channel::<QueueItem>();
     tauri::async_runtime::spawn(process_queue(app.clone(), cfg.clone(), rx));
 
+    let types: Vec<String> = existing_targets
+        .iter()
+        .map(|(_, t)| t.clone())
+        .collect();
+    let cfg_dirs = cfg.clone();
+    let types_dirs = types.clone();
+    match std::thread::spawn(move || {
+        tauri::async_runtime::block_on(uploader::ensure_product_dirs(&cfg_dirs, &types_dirs))
+    })
+    .join()
+    .unwrap_or_else(|_| Err("Could not prepare remote folders.".into()))
+    {
+        Ok(()) => send_log(
+            app,
+            "ok",
+            format!(
+                "Remote folders ready: {}",
+                types
+                    .iter()
+                    .map(|t| format!("/{t}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        ),
+        Err(err) => send_log(
+            app,
+            "error",
+            format!("Could not create remote /LGD or /NATURAL folder: {err}"),
+        ),
+    }
+
     let pending: PendingMap = Arc::new(Mutex::new(HashMap::new()));
     let mut debouncers = Vec::new();
     let mut watched_labels = Vec::new();
+    let mut queued = 0usize;
     for (target, product_type) in existing_targets {
-        enqueue_existing(&target, &product_type, &tx);
+        queued += enqueue_existing(&target, &product_type, &tx);
         let label = format!("{} → /{}", product_type, product_type);
         watched_labels.push(format!("{} ({})", label, target.display()));
         debouncers.push(watch_target(
@@ -404,6 +438,19 @@ pub fn start_watching(app: &AppHandle, config: &FtpConfig) -> Result<(), String>
             watched_labels.join("; ")
         ),
     );
+    if queued > 0 {
+        send_log(
+            app,
+            "info",
+            format!("{queued} existing file(s) uploading now (no 30s wait)."),
+        );
+    } else {
+        send_log(
+            app,
+            "info",
+            "No existing files in the watch path. Save or add a file — it uploads 30 seconds after the last change.",
+        );
+    }
     Ok(())
 }
 

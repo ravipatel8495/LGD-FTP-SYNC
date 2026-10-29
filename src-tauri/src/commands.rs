@@ -147,16 +147,27 @@ pub async fn test_ftp(app: AppHandle, config: FtpConfig) -> ApiResult {
 }
 
 #[tauri::command]
-pub fn start_watch(app: AppHandle, config: FtpConfig) -> bool {
+pub fn start_watch(app: AppHandle, config: FtpConfig) -> ApiResult {
     let merged = config::merge_with_saved(&app, &config, Some(false));
-    let started = watcher::start_watching(&app, &merged).is_ok();
-    let mut to_save = merged;
-    to_save.watching = started;
-    config::save_config(&app, &to_save);
-    set_autostart(&app, started);
-    tray::update_tray(&app, started);
-    watcher::emit_watch_state(&app, started);
-    started
+    match watcher::start_watching(&app, &merged) {
+        Ok(()) => {
+            let mut to_save = merged;
+            to_save.watching = true;
+            config::save_config(&app, &to_save);
+            set_autostart(&app, true);
+            tray::update_tray(&app, true);
+            watcher::emit_watch_state(&app, true);
+            ApiResult {
+                ok: true,
+                message: "Watching started. Existing files upload now; new changes wait 30 seconds."
+                    .to_string(),
+            }
+        }
+        Err(err) => {
+            watcher::send_log(&app, "error", err.clone());
+            ApiResult { ok: false, message: err }
+        }
+    }
 }
 
 #[tauri::command]
